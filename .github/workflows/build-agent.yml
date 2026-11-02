@@ -1,0 +1,62 @@
+name: Build agent.exe
+
+# Запускается вручную: вкладка Actions -> "Build agent.exe" -> Run workflow.
+# Адрес сервера и ключ не хранятся в коде - берутся из секретов репозитория
+# (Settings -> Secrets and variables -> Actions), поэтому держите репозиторий приватным.
+
+on:
+  workflow_dispatch:
+    inputs:
+      device_name:
+        description: "Имя устройства (как будет видно на сайте)"
+        default: "ПК сына"
+        required: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: agent
+        run: pip install -r requirements.txt
+
+      - name: Write embedded config
+        working-directory: agent
+        shell: python
+        env:
+          SERVER_URL: ${{ secrets.SERVER_URL }}
+          AGENT_KEY: ${{ secrets.AGENT_KEY }}
+          DEVICE_NAME: ${{ github.event.inputs.device_name }}
+        run: |
+          import json, os
+          if not os.environ.get("SERVER_URL") or not os.environ.get("AGENT_KEY"):
+              raise SystemExit(
+                  "Задайте секреты SERVER_URL и AGENT_KEY: "
+                  "Settings -> Secrets and variables -> Actions -> New repository secret"
+              )
+          json.dump(
+              {
+                  "server_url": os.environ["SERVER_URL"],
+                  "agent_key": os.environ["AGENT_KEY"],
+                  "device_name": os.environ.get("DEVICE_NAME") or "ПК сына",
+                  "show_indicator": True,
+              },
+              open("embedded_config.json", "w", encoding="utf-8"),
+              ensure_ascii=False,
+          )
+
+      - name: Build agent.exe
+        working-directory: agent
+        run: pyinstaller --onefile --noconsole --name agent --add-data "embedded_config.json;." agent.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent.exe
+          path: agent/dist/agent.exe
+          retention-days: 14

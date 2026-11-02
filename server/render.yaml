@@ -1,0 +1,22 @@
+# Blueprint для Render: в панели Render -> New -> Blueprint, указать этот репозиторий.
+# Можно и без Blueprint - см. раздел "Деплой на Render" в README.md.
+#
+# Бесплатный план: без постоянного диска (база сбрасывается при каждом
+# перезапуске сервиса) и сервис засыпает без обращений ~15 минут - первое
+# открытие сайта после сна займёт до минуты. Подробности и как их смягчить -
+# в README.md.
+services:
+  - type: web
+    name: family-monitor
+    runtime: python
+    plan: free
+    rootDir: server
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PARENT_PASSWORD
+        sync: false       # задать значение в панели Render
+      - key: AGENT_KEY
+        sync: false       # задать значение в панели Render
+      - key: TZ_NAME
+        value: Europe/Kyiv
